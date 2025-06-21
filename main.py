@@ -19,7 +19,8 @@ modelLists = {
     "gemini-1.5-flash" : "gemini", 
     "gemini-1.5-pro" : "gemini",
     "gemini-pro": "gemini",
-    "llama3-8b-8192": "groq"
+    "llama3-8b-8192": "groq",
+    "dall-e-3": "openai"
 }
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
@@ -69,7 +70,7 @@ async def API(ctx, provider: str, *, key: str):
         await ctx.send("❌ Please DM me your API keys, don't share them in public.")
         return
 
-    if provider not in ["gemini", "groq"]:
+    if provider not in ["gemini", "groq", "openai"]:
         await ctx.send("❌ Invalid provider. Supported: gemini and groq (for now)")
         return
 
@@ -155,5 +156,43 @@ async def AIstatus(ctx):
         f"• API Key: `{api}`"
     )
 
+@bot.command()
+async def image(ctx, *, prompt: str):
+    user_id = ctx.author.id
+    session = usersessions.get(user_id, {})
+    apis = session.get("apis", {})
+
+    openai_key = apis.get("openai")
+
+    if not openai_key:
+        if ctx.guild is not None:
+            await ctx.send("❌ Please send me your OpenAI API key using `/API openai <key>` in **DMs** to use this command.")
+        else:
+            await ctx.send("❌ You need to add your OpenAI API key using `/API openai <key>`.")
+        return
+
+    await ctx.send(f"🎨 Generating image for: `{prompt}`...")
+
+    try:
+        client = OpenAI(api_key=openai_key)
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1
+        )
+        image_url = response.data[0].url
+
+        embed = discord.Embed(
+            title="🖼️ DALL·E 3 (OpenAI)",
+            description=f"[Click to view full image]({image_url})"
+        )
+        embed.set_image(url=image_url)
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        print(f"OpenAI Image Error: {e}")
+        await ctx.send("❌ Failed to generate image using OpenAI. Please check your API key or prompt.")
 
 bot.run(discord_token, log_handler=handler, log_level=logging.DEBUG)
