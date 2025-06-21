@@ -29,7 +29,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix='/', intents=intents)
+bot = commands.Bot(command_prefix='/', intents=intents, help_command=None)
 
 # Functions to ask different models
 async def askGemini(ctx, prompt: str, model: str, api: str):
@@ -105,7 +105,28 @@ async def ask(ctx,*, prompt:str):
         await askGemini(ctx, prompt, modelType, AI_token)
     if provider in "groq":
         await askGroq(ctx, prompt, modelType, AI_token)
-    
+
+@bot.command()
+async def help(ctx):
+    help_message = """
+    **🤖 AI ChatBot Help Menu**
+
+    Here are the available commands:
+
+    📌 **Model & Token Setup**
+    `/model <model_name>` — Set the model you'd like to use  
+    `/model status` — Check the currently selected model  
+    `/API <your_api_key>` — Set your API token
+
+    💬 **Chatting**
+    `/ask <prompt>` — Ask the AI your question or message
+
+    📋 **Info**
+    `/help` — Show this help message
+
+        """
+    await ctx.send(help_message)
+
 
 
 bot.run(discord_token, log_handler=handler, log_level=logging.DEBUG)
