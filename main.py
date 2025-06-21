@@ -16,18 +16,13 @@ discord_token = os.getenv('DISCORD_TOKEN')
 AI_token = ""
 modelType = ""
 
-#Exporting .txt file into list
-gemini = [
-    "gemini-1.5-flash", 
-    "gemini-1.5-pro",
-    "gemini-pro"
-]
 
-groq = [
-    "llama3-8b-8192"
-]
-
-modelLists = gemini + groq
+modelLists = {
+    "gemini-1.5-flash" : "gemini", 
+    "gemini-1.5-pro" : "gemini",
+    "gemini-pro": "gemini",
+    "llama3-8b-8192": "groq"
+}
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
@@ -96,6 +91,7 @@ async def model(ctx, *, message):
 
 @bot.command()
 async def ask(ctx,*, prompt:str):
+    provider = modelLists.get(modelType)
     if not AI_token and modelType:
         await ctx.send("Please set the API token first using `/API <token>`")
         return
@@ -105,9 +101,9 @@ async def ask(ctx,*, prompt:str):
     if not AI_token and not modelType:
         await ctx.send("Please set the API token and model type first using `/API <token>` and `/model <model_name>`.")
         return
-    if modelType in gemini:
+    if provider == "gemini":
         await askGemini(ctx, prompt, modelType, AI_token)
-    if modelType in groq:
+    if provider in "groq":
         await askGroq(ctx, prompt, modelType, AI_token)
     
 
