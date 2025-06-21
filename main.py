@@ -95,7 +95,7 @@ async def model(ctx, *, message):
 @bot.command()
 async def ask(ctx, *, prompt: str):
     user_id = ctx.author.id
-    session = usersessions.get(user_id, {})
+    session = usersessions.setdefault(user_id, {})
 
     model = session.get("model")
     provider = modelLists.get(model)
@@ -109,9 +109,33 @@ async def ask(ctx, *, prompt: str):
         return
 
     if provider == "gemini":
-        await askGemini(ctx, prompt, model, api_key)
+        try:
+            genai.configure(api_key=api_key)
+            model_instance = genai.GenerativeModel(model_name=model)
+            history = session.setdefault("history", [])
+            history.append({"role": "user", "parts": [prompt]})
+            response = model_instance.generate_content(history)
+            history.append({"role": "model", "parts": [response.text]})
+            session["history"] = history[-10:]
+            await ctx.send((response.text or "No response.")[:1000])
+        except Exception:
+            await ctx.send("Error, it looks like the API token is invalid or you do not have enough credits to use this model!")
     elif provider == "groq":
-        await askGroq(ctx, prompt, model, api_key)
+        try:
+            client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+            history = session.setdefault("history", [])
+            history.append({"role": "user", "content": prompt})
+            response = client.chat.completions.create(
+                model=model,
+                messages=history
+            )
+            reply = response.choices[0].message.content
+            history.append({"role": "assistant", "content": reply})
+            session["history"] = history[-10:]
+            await ctx.send((reply or "No response.")[:1000])
+        except Exception as e:
+            print(f"Groq API Error: {e}")
+            await ctx.send("Error, it looks like the API token is invalid or you do not have enough credits to use this model!")
     else:
         await ctx.send("Unsupported provider.")
 
