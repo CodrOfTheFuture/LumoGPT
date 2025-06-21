@@ -218,5 +218,11 @@ async def image(ctx, *, prompt: str):
     except Exception as e:
         print(f"OpenAI Image Error: {e}")
         await ctx.send("❌ Failed to generate image using OpenAI. Please check your API key or prompt.")
+        
+@bot.command()
+async def clearhistory(ctx):
+    session = usersessions.get(ctx.author.id, {})
+    session["history"] = []
+    await ctx.send("🧠 Conversation history cleared.")
 
 bot.run(discord_token, log_handler=handler, log_level=logging.DEBUG)
