@@ -120,6 +120,11 @@ async def ask(ctx, *, prompt: str):
     else:
         await ctx.send("Invalid or unsupported model selected.")
 
+@bot.command()
+async def reset(ctx):
+    user_id = ctx.author.id
+    usersessions.pop(user_id, None)
+    await ctx.send("Your session has been reset. Please use `/model` and `/API` to start again.")
 
 @bot.command()
 async def help(ctx):
