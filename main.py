@@ -20,7 +20,13 @@ modelLists = {
     "gemini-1.5-pro" : "gemini",
     "gemini-pro": "gemini",
     "llama3-8b-8192": "groq",
-    "dall-e-3": "openai"
+    "llama3-70b-8192": "groq",
+    "mixtral-8x7b-32768": "groq",
+    "gemma-7b-it" : "groq",
+    "dall-e-3": "openai",
+    "gpt-3.5-turbo": "openai",
+    "gpt-4": "openai",
+    "gpt-4o": "openai"
 }
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
@@ -108,6 +114,8 @@ async def ask(ctx, *, prompt: str):
         await ctx.send(f"Missing API key for `{provider}`. Please DM me: `/API {provider} <key>`")
         return
 
+    session["usage_count"] = session.get("usage_count", 0) + 1
+
     if provider == "gemini":
         try:
             genai.configure(api_key=api_key)
@@ -136,8 +144,21 @@ async def ask(ctx, *, prompt: str):
         except Exception as e:
             print(f"Groq API Error: {e}")
             await ctx.send("Error, it looks like the API token is invalid or you do not have enough credits to use this model!")
+    elif provider == "openai":
+        client = OpenAI(api_key=api_key)
+        history = session.setdefault("history", [])
+        history.append({"role": "user", "content": prompt})
+        response = client.chat.completions.create(
+            model=model,
+            messages=history
+        )
+        reply = response.choices[0].message.content
+        history.append({"role": "assistant", "content": reply})
+        session["history"] = history[-10:]
+        await ctx.send((reply or "No response.")[:1000])
     else:
-        await ctx.send("Unsupported provider.")
+        await ctx.send("❌ Unsupported model or provider. Please check your setup.")
+
 
 @bot.command()
 async def reset(ctx):
@@ -172,12 +193,13 @@ async def AIstatus(ctx):
     session = usersessions.get(user_id, {})
 
     model = session.get("model", "❌ Not set")
-    api = "✅ Set" if "api" in session else "❌ Not set"
+    apis = session.get("apis", {})
+    api_status = "✅ Set" if apis else "❌ Not set"
 
     await ctx.send(
         f"**🔎 Your Session Status:**\n"
         f"• Model: `{model}`\n"
-        f"• API Key: `{api}`"
+        f"• API Key: `{api_status}`"
     )
 
 @bot.command()
@@ -218,11 +240,18 @@ async def image(ctx, *, prompt: str):
     except Exception as e:
         print(f"OpenAI Image Error: {e}")
         await ctx.send("❌ Failed to generate image using OpenAI. Please check your API key or prompt.")
-        
+
 @bot.command()
 async def clearhistory(ctx):
     session = usersessions.get(ctx.author.id, {})
     session["history"] = []
     await ctx.send("🧠 Conversation history cleared.")
+
+@bot.command()
+async def usage(ctx):
+    session = usersessions.get(ctx.author.id, {})
+    usage_count = session.get("usage_count", 0)
+    await ctx.send(f"📊 You've made `{usage_count}` requests so far.")
+
 
 bot.run(discord_token, log_handler=handler, log_level=logging.DEBUG)
