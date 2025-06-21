@@ -40,6 +40,7 @@ async def askGemini(ctx, prompt: str, model: str, api: str):
         await ctx.send(f"Error, it looks like the API token is invalid or you do not have enough credits to use this model!")
 
 
+
 async def askGroq(ctx, prompt: str, model: str, api: str):
     try:
         client = OpenAI(
@@ -61,29 +62,25 @@ async def on_ready():
 
 #Discord commands
 @bot.command()
-async def API(ctx, *, message):
+async def API(ctx, provider: str, *, key: str):
     user_id = ctx.author.id
-    session = usersessions.setdefault(user_id, {})
-    
-    if "model" not in session:
-        await ctx.send("Please set the model type first using `/model <model_name>`.")
+
+    if not isinstance(ctx.channel, discord.DMChannel):
+        await ctx.send("❌ Please DM me your API keys, don't share them in public.")
         return
-    
-    session["api"] = message
-    await ctx.send("API token has been set!")
+
+    if provider not in ["gemini", "groq"]:
+        await ctx.send("❌ Invalid provider. Supported: gemini and groq (for now)")
+        return
+
+    session = usersessions.setdefault(user_id, {})
+    session.setdefault("apis", {})[provider] = key
+    await ctx.send(f"✅ Your `{provider}` API key has been saved.")
 
 @bot.command()
 async def model(ctx, *, message):
     user_id = ctx.author.id
     session = usersessions.setdefault(user_id, {})
-
-    if message == "status":
-        model = session.get("model")
-        if not model:
-            await ctx.send("Model type is not set. Please set it using `/model <model_name>`.")
-        else:
-            await ctx.send(f"Current model type is: {model}")
-        return
 
     if message not in modelLists:
         model_names = ', '.join(modelLists.keys())
@@ -91,7 +88,7 @@ async def model(ctx, *, message):
         return
 
     session["model"] = message
-    await ctx.send(f"Model type has been set to {message}!")
+    await ctx.send(f"Model has been set to {message}!")
 
 
 @bot.command()
@@ -100,25 +97,22 @@ async def ask(ctx, *, prompt: str):
     session = usersessions.get(user_id, {})
 
     model = session.get("model")
-    api = session.get("api")
-
-    if not api and model:
-        await ctx.send("Please set the API token first using `/API <token>`.")
-        return
-    if not model and api:
-        await ctx.send("Please set the model type first using `/model <model_name>`.")
-        return
-    if not model and not api:
-        await ctx.send("Please set the API token and model type first using `/API <token>` and `/model <model_name>`.")
-        return
-
     provider = modelLists.get(model)
+    api_key = session.get("apis", {}).get(provider)
+
+    if not model:
+        await ctx.send("Please set a model first using `/model <model_name>`.")
+        return
+    if not api_key:
+        await ctx.send(f"Missing API key for `{provider}`. Please DM me: `/API {provider} <key>`")
+        return
+
     if provider == "gemini":
-        await askGemini(ctx, prompt, model, api)
+        await askGemini(ctx, prompt, model, api_key)
     elif provider == "groq":
-        await askGroq(ctx, prompt, model, api)
+        await askGroq(ctx, prompt, model, api_key)
     else:
-        await ctx.send("Invalid or unsupported model selected.")
+        await ctx.send("Unsupported provider.")
 
 @bot.command()
 async def reset(ctx):
@@ -147,6 +141,19 @@ async def help(ctx):
         """
     await ctx.send(help_message)
 
+@bot.command()
+async def AIstatus(ctx):
+    user_id = ctx.author.id
+    session = usersessions.get(user_id, {})
+
+    model = session.get("model", "❌ Not set")
+    api = "✅ Set" if "api" in session else "❌ Not set"
+
+    await ctx.send(
+        f"**🔎 Your Session Status:**\n"
+        f"• Model: `{model}`\n"
+        f"• API Key: `{api}`"
+    )
 
 
 bot.run(discord_token, log_handler=handler, log_level=logging.DEBUG)
