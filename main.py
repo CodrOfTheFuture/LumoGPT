@@ -13,9 +13,7 @@ load_dotenv()
 
 # variables
 discord_token = os.getenv('DISCORD_TOKEN')
-AI_token = ""
-modelType = ""
-
+usersessions = {}
 
 modelLists = {
     "gemini-1.5-flash" : "gemini", 
@@ -64,47 +62,64 @@ async def on_ready():
 #Discord commands
 @bot.command()
 async def API(ctx, *, message):
-    global AI_token
-    if not modelType:
+    user_id = ctx.author.id
+    session = usersessions.setdefault(user_id, {})
+    
+    if "model" not in session:
         await ctx.send("Please set the model type first using `/model <model_name>`.")
         return
-    else:
-        AI_token = message
-        await ctx.send(f"API token has been set!")
+    
+    session["api"] = message
+    await ctx.send("API token has been set!")
 
 @bot.command()
 async def model(ctx, *, message):
-    global modelType
+    user_id = ctx.author.id
+    session = usersessions.setdefault(user_id, {})
+
     if message == "status":
-        if not modelType:
+        model = session.get("model")
+        if not model:
             await ctx.send("Model type is not set. Please set it using `/model <model_name>`.")
         else:
-            await ctx.send(f"Current model type is: {modelType}")
-        return
-    if message not in modelLists:
-        await ctx.send(f"Invalid model type. Here is a list of valid models: {modelLists}") #edit this with github .txt link
-        return
-    else:
-        modelType = message
-        await ctx.send(f"Model type has been set to {modelType}!")
+            await ctx.send(f"Current model type is: {model}")
         return
 
-@bot.command()
-async def ask(ctx,*, prompt:str):
-    provider = modelLists.get(modelType)
-    if not AI_token and modelType:
-        await ctx.send("Please set the API token first using `/API <token>`")
+    if message not in modelLists:
+        model_names = ', '.join(modelLists.keys())
+        await ctx.send(f"Invalid model type. Valid models: {model_names}")
         return
-    if not modelType and AI_token:
+
+    session["model"] = message
+    await ctx.send(f"Model type has been set to {message}!")
+
+
+@bot.command()
+async def ask(ctx, *, prompt: str):
+    user_id = ctx.author.id
+    session = usersessions.get(user_id, {})
+
+    model = session.get("model")
+    api = session.get("api")
+
+    if not api and model:
+        await ctx.send("Please set the API token first using `/API <token>`.")
+        return
+    if not model and api:
         await ctx.send("Please set the model type first using `/model <model_name>`.")
         return
-    if not AI_token and not modelType:
+    if not model and not api:
         await ctx.send("Please set the API token and model type first using `/API <token>` and `/model <model_name>`.")
         return
+
+    provider = modelLists.get(model)
     if provider == "gemini":
-        await askGemini(ctx, prompt, modelType, AI_token)
-    if provider in "groq":
-        await askGroq(ctx, prompt, modelType, AI_token)
+        await askGemini(ctx, prompt, model, api)
+    elif provider == "groq":
+        await askGroq(ctx, prompt, model, api)
+    else:
+        await ctx.send("Invalid or unsupported model selected.")
+
 
 @bot.command()
 async def help(ctx):
