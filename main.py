@@ -2,11 +2,14 @@
 import discord
 import logging
 import os
+import asyncio
 from discord.ext import commands
 from dotenv import load_dotenv
 import google.generativeai as genai
 import openai
 from openai import OpenAI
+from datetime import datetime, timedelta
+import dateparser
 
 
 load_dotenv()
@@ -14,6 +17,7 @@ load_dotenv()
 # variables
 discord_token = os.getenv('DISCORD_TOKEN')
 usersessions = {}
+scheduled_reminders = []
 
 modelLists = {
     "gemini-1.5-flash" : "gemini", 
@@ -252,6 +256,66 @@ async def usage(ctx):
     session = usersessions.get(ctx.author.id, {})
     usage_count = session.get("usage_count", 0)
     await ctx.send(f"📊 You've made `{usage_count}` requests so far.")
+
+
+@bot.command()
+async def remindme(ctx, *, time_text: str):
+    reply_message = ctx.message.reference
+    original_message = None
+
+    if reply_message:
+        try:
+            channel = ctx.channel
+            original_message = await channel.fetch_message(reply_message.message_id)
+        except:
+            await ctx.send("❌ Couldn't fetch the original message you replied to.")
+            return
+
+    reminder_time = dateparser.parse(time_text, settings={'PREFER_DATES_FROM': 'future'})
+    if not reminder_time:
+        await ctx.send("❌ I couldn't understand that time. Try something like `10 minutes` or `2 hours`.")
+        return
+
+    delay = (reminder_time - datetime.now()).total_seconds()
+    if delay < 0:
+        await ctx.send("❌ Time must be in the future.")
+        return
+
+    await ctx.send("✅ Reminder set!")
+
+    task = asyncio.create_task(schedule_reminder(ctx.author, original_message, time_text, delay))
+    scheduled_reminders.append((ctx.author.id, reminder_time, task))
+
+async def schedule_reminder(user, message, time_text, delay):
+    await asyncio.sleep(delay)
+    try:
+        dm_channel = await user.create_dm()
+        if message:
+            jump_link = message.jump_url
+            await dm_channel.send(f"🔔 Reminder: You asked to be reminded about [this message]({jump_link}).")
+        else:
+            await dm_channel.send(f"🔔 Reminder: This is your reminder.")
+    except Exception as e:
+        print(f"DM Reminder Error: {e}")
+
+@bot.command()
+async def reminders(ctx):
+    now = datetime.now()
+    user_reminders = [r for r in scheduled_reminders if r[0] == ctx.author.id]
+    if not user_reminders:
+        await ctx.send("📭 You have no active reminders.")
+        return
+
+    lines = [f"⏰ <t:{int(r[1].timestamp())}:R>" for r in user_reminders if r[1] > now]
+    await ctx.send("📋 Your reminders:\n" + "\n".join(lines))
+
+@bot.command()
+async def cancelreminders(ctx):
+    global scheduled_reminders
+    before = len(scheduled_reminders)
+    scheduled_reminders = [(uid, t, task) for uid, t, task in scheduled_reminders if uid != ctx.author.id or task.cancel()]
+    after = len(scheduled_reminders)
+    await ctx.send(f"🗑️ Cancelled {before - after} reminders.")
 
 
 bot.run(discord_token, log_handler=handler, log_level=logging.DEBUG)
