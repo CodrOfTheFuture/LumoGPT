@@ -27,6 +27,8 @@ modelLists = {
     "llama3-70b-8192": "groq",
     "mixtral-8x7b-32768": "groq",
     "gemma-7b-it" : "groq",
+    "deepseek-r1-distill-llama-70b": "groq",
+    "deepseek-r1-distill-llama-8b": "groq",
     "dall-e-3": "openai",
     "gpt-3.5-turbo": "openai",
     "gpt-4": "openai",
