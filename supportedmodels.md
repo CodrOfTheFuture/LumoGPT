@@ -6,9 +6,6 @@ gemini-pro
 ## Open AI
 gpt-4
 
-## Claude
-claude-3-sonnet
-
 ## Groq
 llama3-70b-8192
 llama3-8b-8192
