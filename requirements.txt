@@ -1,5 +1,5 @@
 discord.py
 python-dotenv
 google-generativeai
-openai #openai>=1.0.0
+openai
 dateparser
